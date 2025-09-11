@@ -7,6 +7,7 @@
 
 struct Workspace {
     size_t id;
+    int monitorId;
     std::vector<HWND> windows;
     bool isSelected = false;
     HWND selectedWindow;
@@ -36,12 +37,23 @@ struct Workspace {
     }
 
     void MoveToWorkspace(Workspace& old, HWND window) {
+
+        if (&old == this) {
+            return;
+        }
+
         if (!old.RemoveFromWorkspace(window)) {
             std::cout << "Failed to move HWND to workspace: " << window << std::endl;
             return;
         }
+
+        // Always hide the window when moving it, regardless of monitor
         HideWindowInstant(window);
+
         this->AddToWorkspace(window);
+        if (this->isSelected) {
+            ShowWindowInstant(window);
+        }
     }
 
     void HideWorkspace() {

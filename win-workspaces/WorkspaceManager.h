@@ -21,10 +21,14 @@ public:
     void Update();
     void OnWindowCreated(HWND hwnd);
 
+    void DumpWorkspaces() const;
+
 private:
     HMONITOR GetCursorMonitor();
     int GetMonitorIndex(HMONITOR hMonitor);
     bool IsWindowTracked(HWND hwnd);
+    int GetWorkspaceMonitorIndex(HWND hwnd);
+    void DumpAllWorkspaces();
 
     // Static callback for WinAPI
     static void CALLBACK WinEventProc(
@@ -39,4 +43,7 @@ private:
 
     static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData);
     static WorkspaceManager* instance;
+
+private:
+    bool keyDown[10] = { false };
 };

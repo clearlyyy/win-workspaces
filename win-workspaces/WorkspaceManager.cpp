@@ -2,6 +2,9 @@
 
 WorkspaceManager* WorkspaceManager::instance = nullptr;
 
+// TODO: MULTI MONITOR WINDOW MOVING TO OTHER WORKSPACES!
+
+
 static bool IsRealWindow(HWND hwnd) {
     // Skip Invisible Windows
     if (!IsWindowVisible(hwnd)) return false;
@@ -40,17 +43,17 @@ static BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor,
 
 WorkspaceManager::WorkspaceManager() {
 
-
     instance = this;
     hwEventHook = SetWinEventHook(
         EVENT_OBJECT_CREATE,
-        EVENT_OBJECT_SHOW,
+        EVENT_OBJECT_LOCATIONCHANGE,
         NULL,
         WinEventProc,
         0, // all processes
         0, /// all threads
         WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS
     );
+
     EnumDisplayMonitors(NULL, NULL, WorkspaceManager::MonitorEnumCallback, reinterpret_cast<LPARAM>(this));
 
     // Enumerate all windows
@@ -77,20 +80,31 @@ WorkspaceManager::~WorkspaceManager() {
 }
 void WorkspaceManager::Update() {
     focusedWindow = GetForegroundWindow();
+
     bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000);
     bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000);
     if (!alt) return;
+
+
     HMONITOR cursorMon = GetCursorMonitor();
     int monIndex = GetMonitorIndex(cursorMon);
     if (monIndex == -1) return;
+
     auto& workspaces = Workspaces[monIndex];
-    for (int i = 0; i <= 9; i++) {
-        if (GetAsyncKeyState('0' + i) & 0x8000) {
+
+    for (int i = 1; i <= 9; i++) {
+		bool pressed = (GetAsyncKeyState('0' + i) & 0x8000) != 0;
+
+        if (pressed && !keyDown[i-1]) {
+            keyDown[i - 1] = true;
             int wsIndex = i - 1;
+
             if (!shift) {
                 std::cout << "ALT + " << i << " pressed\n";
-                for (auto& ws : workspaces)
+                for (auto& ws : workspaces) {
+                    ws.isSelected = false;
                     ws.HideWorkspace();
+                }
                 workspaces[wsIndex].isSelected = true;
                 workspaces[wsIndex].ShowWorkspace();
                 currentWorkspace[monIndex] = wsIndex;
@@ -100,10 +114,13 @@ void WorkspaceManager::Update() {
                     int curWs = currentWorkspace[monIndex];
                     workspaces[wsIndex].MoveToWorkspace(workspaces[curWs], focusedWindow);
                     workspaces[wsIndex].Update();
+					DumpWorkspaces();
                 }
             }
-            Sleep(200);
-            break;
+        }
+
+        if (!pressed && keyDown[i - 1]) {
+            keyDown[i - 1] = false;
         }
     }
 }
@@ -134,13 +151,60 @@ void CALLBACK WorkspaceManager::WinEventProc(
     DWORD dwEventThread,
     DWORD dwmsEventTime
 ) {
-    if (idObject != OBJID_WINDOW || !IsWindowVisible(hwnd)) return;
+
     if (!instance) return;
+    if (idObject != OBJID_WINDOW) return;
+    if (!IsWindow(hwnd) || !IsWindowVisible(hwnd)) return;
 
-    if (instance->IsWindowTracked(hwnd)) return;
+    // Handle new window creation
+    if (event == EVENT_OBJECT_CREATE || event == EVENT_OBJECT_SHOW) {
+		if (instance->IsWindowTracked(hwnd)) return;
+        instance->OnWindowCreated(hwnd);
+		return;
+    }
 
-    instance->OnWindowCreated(hwnd);
+    // Handle window movement
+    if (event == EVENT_OBJECT_LOCATIONCHANGE) {
+        HMONITOR newMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        int newMonIndex = instance->GetMonitorIndex(newMon);
+        if (newMonIndex == -1) return;
 
+        int oldMonIndex = instance->GetWorkspaceMonitorIndex(hwnd);
+        if (oldMonIndex == -1) return;
+
+        if (oldMonIndex != newMonIndex) {
+            int oldWsIndex = instance->currentWorkspace[oldMonIndex];
+            int newWsIndex = instance->currentWorkspace[newMonIndex];
+
+            auto& oldWs = instance->Workspaces[oldMonIndex][oldWsIndex];
+            auto& newWs = instance->Workspaces[newMonIndex][newWsIndex];
+
+            std::cout << "Window " << hwnd << " moved from monitor "
+                << oldMonIndex << " to monitor " << newMonIndex << "\n";
+
+            newWs.MoveToWorkspace(oldWs, hwnd);
+        }
+    }
+
+    //if (idObject != OBJID_WINDOW || !IsWindowVisible(hwnd)) return;
+    //if (!instance) return;
+    //
+    //if (instance->IsWindowTracked(hwnd)) return;
+    //
+    //instance->OnWindowCreated(hwnd);
+
+}
+
+int WorkspaceManager::GetWorkspaceMonitorIndex(HWND hwnd) {
+    for (size_t monIdx = 0; monIdx < Workspaces.size(); monIdx++) {
+        for (size_t wsIdx = 0; wsIdx < Workspaces[monIdx].size(); wsIdx++) {
+            auto& ws = Workspaces[monIdx][wsIdx];
+            if (std::find(ws.windows.begin(), ws.windows.end(), hwnd) != ws.windows.end()) {
+                return static_cast<int>(monIdx);
+            }
+        }
+    }
+    return -1;
 }
 
 bool WorkspaceManager::IsWindowTracked(HWND hwnd) {
@@ -165,13 +229,63 @@ int WorkspaceManager::GetMonitorIndex(HMONITOR hMonitor) {
 
 BOOL CALLBACK WorkspaceManager::MonitorEnumCallback(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData) {
     WorkspaceManager* mgr = reinterpret_cast<WorkspaceManager*>(dwData);
+    int monIndex = static_cast<int>(mgr->monitors.size());
     mgr->monitors.push_back(hMonitor);
     std::vector<Workspace> wsVec;
     for (int i = 0; i < 9; i++) {
         Workspace ws;
         ws.id = i + 1;
+        ws.monitorId = monIndex;
         wsVec.push_back(ws);
     }
     mgr->Workspaces.push_back(wsVec);
     return TRUE;
+}
+
+void WorkspaceManager::DumpWorkspaces() const {
+    std::cout << "=== Workspace Dump (non-empty only) ===\n";
+
+    // iterate monitors
+    for (size_t mon = 0; mon < Workspaces.size(); ++mon) {
+        const auto& wsVec = Workspaces[mon];
+        // skip monitors that have no workspaces (shouldn't normally happen)
+        if (wsVec.empty()) continue;
+
+        // decide whether this monitor has any non-empty workspace; skip if none
+        bool monitorHasWindows = false;
+        for (const auto& ws : wsVec) {
+            if (!ws.windows.empty()) { monitorHasWindows = true; break; }
+        }
+        if (!monitorHasWindows) continue;
+
+        // print monitor header
+        std::cout << "Monitor " << mon;
+        if (mon < monitors.size()) {
+            std::cout << " (hmon=" << monitors[mon] << ")";
+        }
+        // print current workspace index for this monitor (if available)
+        if (mon < currentWorkspace.size()) {
+            std::cout << " currentWs=" << currentWorkspace[mon];
+        }
+        std::cout << '\n';
+
+        // print each non-empty workspace for this monitor
+        for (size_t w = 0; w < wsVec.size(); ++w) {
+            const Workspace& ws = wsVec[w];
+            if (ws.windows.empty()) continue; // only show workspaces that actually have windows
+
+            std::cout << "  WS[" << w << "] id=" << ws.id
+                << (ws.isSelected ? " [ACTIVE]" : "")
+                << " count=" << ws.windows.size() << '\n';
+
+            for (HWND hwnd : ws.windows) {
+                char title[256] = { 0 };
+                // try to get window title; if empty that's okay
+                GetWindowTextA(hwnd, title, sizeof(title));
+                std::cout << "    HWND: " << hwnd << " Title: \"" << title << "\"\n";
+            }
+        }
+    }
+
+    std::cout << "=== End Dump ===\n";
 }
