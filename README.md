@@ -14,7 +14,7 @@ Fast, simple, i3/dwm/hyprland - like workspaces for windows 10/11 with multi-mon
   Using the WINAPI; win-workspaces virtually assigns windows to workspaces, modifying their visbility based on the workspace your on. It also disables window animations, making it feel super smooth and nice to use.
   There is no Tiling, no bullshit, just monitor-independent workspaces similar to many Linux Window Managers. 
 
-  If using a multi-monitor setup, each monitor has its own set of 9 workspaces. So with a triple-monitor setup you have a total of 27 workspaces. Each monitors 9 workspaces are accesible using ```ALT + 1,2,3,4...9``` and the workspace you switch to depends on the monitor your cursor is on. 
+  If using a multi-monitor setup, each monitor has its own set of 9 workspaces. So with a triple-monitor setup you have a total of 27 workspaces. Each monitors 9 workspaces are accessible using ```ALT + 1,2,3,4...9``` and the workspace you switch to depends on the monitor your cursor is on. 
 
 ## Guide: 
   #### 1. Install via Github [Releases](https://www.google.com)
