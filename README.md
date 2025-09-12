@@ -4,7 +4,7 @@
   <img src="/git-assets/win-workspaces-example.gif" alt="Screenshot" width="500"/>
 </p>
 
-Fast, simple, i3/dwm/hyprland - like workspaces for windows 10/11 with multi-monitor support and monitor independent workspaces in less than 500 lines of code. It is nothing more, and nothing less.
+Fast, simple, i3/dwm/hyprland - like workspaces for windows 10/11 with multi-monitor support and monitor independent workspaces in less than 600 lines of code. It is nothing more, and nothing less.
 
 ![Made by Clearly](https://img.shields.io/badge/Made%20by-Clearly-blue)
 ![Version](https://img.shields.io/badge/Version-1.0.0-blue)
