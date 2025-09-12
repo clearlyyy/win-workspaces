@@ -17,7 +17,7 @@ Fast, simple, i3/dwm/hyprland - like workspaces for windows 10/11 with multi-mon
   If using a multi-monitor setup, each monitor has its own set of 9 workspaces. So with a triple-monitor setup you have a total of 27 workspaces. Each monitors 9 workspaces are accessible using ```ALT + 1,2,3,4...9``` and the workspace you switch to depends on the monitor your cursor is on. 
 
 ## Guide: 
-  #### 1. Install via Github [Releases](https://www.google.com)
+  #### 1. Install via Github [Releases](https://github.com/clearlyyy/win-workspaces/releases/tag/1.0.0)
 
   #### 2. Open the application, and your ready to go.
   
@@ -31,3 +31,6 @@ Fast, simple, i3/dwm/hyprland - like workspaces for windows 10/11 with multi-mon
  As far as i know, you need to use the MSVC Compiler, because the project utilizes ```dwmapi.h```. I've tried to build via MinGW64 and had no luck.
 
  Open the win-workspaces.sln file, and build it in Visual Studio 2022. (Requires Windows SDK, which should come with the "C++ Desktop Development" package in the VS Installer)
+
+## Uninstalling
+  Open Task Manager, go to the "Startup" tab, and disable "win-workspaces"
