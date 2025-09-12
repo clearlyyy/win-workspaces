@@ -1,12 +1,14 @@
 # WIN-WORKSPACES
-<p align="center">
+<p align="center" justify="center">
   <img src="/git-assets/win-workspaces-logo.png" alt="Screenshot" width="300"/>
+  <img src="/git-assets/win-workspaces-example.gif" alt="Screenshot" width="500"/>
 </p>
 
 Fast, simple, i3/dwm/hyprland - like workspaces for windows 10/11 with multi-monitor support and monitor independent workspaces in less than 500 lines of code. It is nothing more, and nothing less.
 
 ![Made by Clearly](https://img.shields.io/badge/Made%20by-Clearly-blue)
 ![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+
 
 ## How it works:
   Using the WINAPI; win-workspaces virtually assigns windows to workspaces, modifying their visbility based on the workspace your on. It also disables window animations, making it feel super smooth and nice to use.
