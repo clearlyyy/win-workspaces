@@ -12,17 +12,17 @@
 #include "WorkspaceManager.h"
 
 
+
 int main()
 {
 
     WorkspaceManager workSpaceManager;
 
     MSG msg;
+    workSpaceManager.InitHotkeys();
+    workSpaceManager.Run();
 
-    //D22222222222222222
     while (true) {
-        // Run workspace Update
-        workSpaceManager.Update();
 
         // Pump Windows messages for WinEvent hook
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -30,8 +30,7 @@ int main()
             DispatchMessage(&msg);
         }
 
-        // Sleep to reduce CPU usage
-        Sleep(10);
+        Sleep(50);
     }
 
     return 0;

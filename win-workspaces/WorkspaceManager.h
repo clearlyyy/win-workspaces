@@ -18,10 +18,9 @@ public:
     WorkspaceManager();
     ~WorkspaceManager();
 
-    void Update();
     void OnWindowCreated(HWND hwnd);
-
-    void DumpWorkspaces() const;
+    void InitHotkeys();
+    void Run();
 
 private:
     HMONITOR GetCursorMonitor();
@@ -29,6 +28,7 @@ private:
     bool IsWindowTracked(HWND hwnd);
     int GetWorkspaceMonitorIndex(HWND hwnd);
     void DumpAllWorkspaces();
+    void HandleHotkey(int id);
 
     // Static callback for WinAPI
     static void CALLBACK WinEventProc(

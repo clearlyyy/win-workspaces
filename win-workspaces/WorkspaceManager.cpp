@@ -78,52 +78,87 @@ WorkspaceManager::~WorkspaceManager() {
         UnhookWinEvent(hwEventHook);
     instance = nullptr;
 }
-void WorkspaceManager::Update() {
+
+void WorkspaceManager::InitHotkeys() {
+    for (int i = 1; i <= 9; i++) {
+        if (!RegisterHotKey(NULL, i, MOD_ALT, '0' + i)) {
+            std::cerr << "Failed to register Alt+" << i << std::endl;
+        }
+    }
+    
+    for (int i = 1; i <= 9; i++) {
+        if (!RegisterHotKey(NULL, 100 + i, MOD_ALT | MOD_SHIFT, '0' + i)) {
+            std::cerr << "Failed to register Alt+Shift+" << i << std::endl;
+        }
+    }
+}
+
+void WorkspaceManager::Run() {
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        if (msg.message == WM_HOTKEY) {
+            int id = (int)msg.wParam;
+            HandleHotkey(id);
+        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+}
+
+void WorkspaceManager::HandleHotkey(int id) {
     focusedWindow = GetForegroundWindow();
-
-    bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000);
-    bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000);
-    if (!alt) return;
-
-
     HMONITOR cursorMon = GetCursorMonitor();
     int monIndex = GetMonitorIndex(cursorMon);
     if (monIndex == -1) return;
 
     auto& workspaces = Workspaces[monIndex];
 
-    for (int i = 1; i <= 9; i++) {
-		bool pressed = (GetAsyncKeyState('0' + i) & 0x8000) != 0;
+    if (id >= 1 && id <= 9) {
+        // ALT+number -> switch workspace
+        int wsIndex = id - 1;
+        std::cout << "ALT + " << id << " pressed\n";
+        for (auto& ws : workspaces) {
+            ws.isSelected = false;
+            ws.HideWorkspace();
+        }
+        workspaces[wsIndex].isSelected = true;
+        workspaces[wsIndex].ShowWorkspace();
+        currentWorkspace[monIndex] = wsIndex;
 
-        if (pressed && !keyDown[i-1]) {
-            keyDown[i - 1] = true;
-            int wsIndex = i - 1;
-
-            if (!shift) {
-                std::cout << "ALT + " << i << " pressed\n";
-                for (auto& ws : workspaces) {
-                    ws.isSelected = false;
-                    ws.HideWorkspace();
-                }
-                workspaces[wsIndex].isSelected = true;
-                workspaces[wsIndex].ShowWorkspace();
-                currentWorkspace[monIndex] = wsIndex;
-            }
-            else {
-                if (focusedWindow) {
-                    int curWs = currentWorkspace[monIndex];
-                    workspaces[wsIndex].MoveToWorkspace(workspaces[curWs], focusedWindow);
-                    workspaces[wsIndex].Update();
-					DumpWorkspaces();
-                }
+        // If theres only one window on workspace, set that to foreground window
+        if (workspaces[wsIndex].windows.size() == 1) {
+            SetForegroundWindow(workspaces[wsIndex].windows[0]);
+        }
+        else { // Otherwise, just set the window the cursor is on to foreground.
+            // Focus Window under cursor
+            POINT pt;
+            GetCursorPos(&pt);
+            HWND hwnd = WindowFromPoint(pt);
+            if (hwnd) {
+                HWND top = GetAncestor(hwnd, GA_ROOT);
+                SetForegroundWindow(top);
             }
         }
-
-        if (!pressed && keyDown[i - 1]) {
-            keyDown[i - 1] = false;
+    }
+    else if (id >= 101 && id <= 109) {
+        // ALT+SHIFT+number -> move window
+        int wsIndex = (id - 100) - 1;
+        if (focusedWindow) {
+            int curWs = currentWorkspace[monIndex];
+            workspaces[wsIndex].MoveToWorkspace(workspaces[curWs], focusedWindow);
+            workspaces[wsIndex].Update();
+            DumpAllWorkspaces();
+            POINT pt;
+            GetCursorPos(&pt);
+            HWND hwnd = WindowFromPoint(pt);
+            if (hwnd) {
+                HWND top = GetAncestor(hwnd, GA_ROOT);
+                SetForegroundWindow(top);
+            }
         }
     }
 }
+
 void WorkspaceManager::OnWindowCreated(HWND hwnd) {
     if (!IsRealWindow(hwnd)) return;
     // Determine monitor of the new window
@@ -242,7 +277,7 @@ BOOL CALLBACK WorkspaceManager::MonitorEnumCallback(HMONITOR hMonitor, HDC, LPRE
     return TRUE;
 }
 
-void WorkspaceManager::DumpWorkspaces() const {
+void WorkspaceManager::DumpAllWorkspaces() {
     std::cout << "=== Workspace Dump (non-empty only) ===\n";
 
     // iterate monitors

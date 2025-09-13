@@ -21,6 +21,7 @@ struct Workspace {
         }
     }
 
+
     bool RemoveFromWorkspace(HWND window) {
         auto newEnd = std::remove(windows.begin(), windows.end(), window);
         if (newEnd != windows.end()) {
