@@ -48,6 +48,8 @@ struct Workspace {
             return;
         }
 
+        HideWindowInstant(window);
+
         this->AddToWorkspace(window);
         
         if (this->isSelected) {
@@ -74,8 +76,6 @@ struct Workspace {
             ShowWindowInstant(windows[i]);
         }
     }
-
-private:
 
     // Hide and show windows, Disable animations without the fucked fade in/out, this required me to use visual studio and i hate it.
     static void HideWindowInstant(HWND hwnd) {

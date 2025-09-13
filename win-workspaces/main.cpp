@@ -48,16 +48,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     workSpaceManager.InitHotkeys();
     workSpaceManager.Run();
 
-    while (true) {
-
-        // Pump Windows messages for WinEvent hook
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-
-        Sleep(50);
-    }
+    
     return 0;
 }
+
+
 

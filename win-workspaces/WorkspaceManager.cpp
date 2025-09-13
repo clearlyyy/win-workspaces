@@ -203,6 +203,7 @@ void WorkspaceManager::HandleHotkey(int id) {
                 // new window that hasn't been added to workspace yet
                 std::cout << "Moving untracked window to workspace " << (wsIndex + 1) << std::endl;
                 workspaces[wsIndex].AddToWorkspace(focusedWindow);
+				workspaces[wsIndex].HideWindowInstant(focusedWindow);
                 if (workspaces[wsIndex].isSelected) {
                     // Only show if the target workspace is selected
                     ShowWindow(focusedWindow, SW_SHOWNA);
