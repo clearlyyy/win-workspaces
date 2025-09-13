@@ -77,6 +77,17 @@ WorkspaceManager::~WorkspaceManager() {
     if (hwEventHook)
         UnhookWinEvent(hwEventHook);
     instance = nullptr;
+
+    // Cleanup and show all windows from other workspaces, so they dont get lost.
+    // Edit: this seems to never even get ran anyways, but i'll keep it here incase one day it does.
+    for (auto& mon : Workspaces) {
+        for (auto& ws : mon) {
+            for (auto& window : ws.windows) {
+                ShowWindow(window, SW_SHOW);
+            }
+        }
+    }
+
 }
 
 void WorkspaceManager::InitHotkeys() {
