@@ -2,16 +2,52 @@
 
 WorkspaceManager* WorkspaceManager::instance = nullptr;
 
-// TODO: MULTI MONITOR WINDOW MOVING TO OTHER WORKSPACES!
-
-
 static bool IsRealWindow(HWND hwnd) {
-    // Skip Invisible Windows
-    if (!IsWindowVisible(hwnd)) return false;
 
+    // Skip Invisible Windows
+    if (!IsWindow(hwnd) || !IsWindowVisible(hwnd)) return false;
+    
     // Skip tool/utility windows
     LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
     if (exStyle & WS_EX_TOOLWINDOW) return false;
+
+    const wchar_t* skipClasses[] = {
+        L"Shell_TrayWnd",
+        L"Start",                    
+        L"TrayNotifyWnd",            
+        L"SearchUI",                 
+        L"Windows.UI.Core.CoreWindow" 
+    };
+
+    wchar_t className[256] = {};
+    GetClassName(hwnd, className, 256);
+    for (auto cls : skipClasses) {
+        if (_wcsicmp(className, cls) == 0)
+            return false;
+    }
+
+    //Skip windows owned by explorer.exe
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    if (pid != 0) {
+		HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnap != INVALID_HANDLE_VALUE) {
+            PROCESSENTRY32 pe = {};
+            pe.dwSize = sizeof(pe);
+            if (Process32First(hSnap, &pe)) {
+                do {
+                    if (pe.th32ProcessID == pid) {
+                        if (_wcsicmp(pe.szExeFile, L"explorer.exe") == 0) {
+                            CloseHandle(hSnap);
+                            return false;
+                        }
+                        break;
+                    }
+				} while (Process32Next(hSnap, &pe));
+            }
+            CloseHandle(hSnap);
+        }
+    }
 
     return true;
 
@@ -128,6 +164,9 @@ void WorkspaceManager::HandleHotkey(int id) {
         // ALT+number -> switch workspace
         int wsIndex = id - 1;
         std::cout << "ALT + " << id << " pressed\n";
+        
+        AddUntrackedWindowsToCurrentWorkspace(monIndex);
+        
         for (auto& ws : workspaces) {
             ws.isSelected = false;
             ws.HideWorkspace();
@@ -155,9 +194,21 @@ void WorkspaceManager::HandleHotkey(int id) {
         // ALT+SHIFT+number -> move window
         int wsIndex = (id - 100) - 1;
         if (focusedWindow) {
-            int curWs = currentWorkspace[monIndex];
-            workspaces[wsIndex].MoveToWorkspace(workspaces[curWs], focusedWindow);
-            workspaces[wsIndex].Update();
+            // Check if window is tracked (in a workspace)
+            if (IsWindowTracked(focusedWindow)) {
+                // window is already in a workspace
+                int curWs = currentWorkspace[monIndex];
+                workspaces[wsIndex].MoveToWorkspace(workspaces[curWs], focusedWindow);
+            } else {
+                // new window that hasn't been added to workspace yet
+                std::cout << "Moving untracked window to workspace " << (wsIndex + 1) << std::endl;
+                workspaces[wsIndex].AddToWorkspace(focusedWindow);
+                if (workspaces[wsIndex].isSelected) {
+                    // Only show if the target workspace is selected
+                    ShowWindow(focusedWindow, SW_SHOWNA);
+                }
+            }
+            
             DumpAllWorkspaces();
             POINT pt;
             GetCursorPos(&pt);
@@ -170,22 +221,26 @@ void WorkspaceManager::HandleHotkey(int id) {
     }
 }
 
+
 void WorkspaceManager::OnWindowCreated(HWND hwnd) {
     if (!IsRealWindow(hwnd)) return;
-    // Determine monitor of the new window
-    HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    int monIndex = GetMonitorIndex(mon);
-    if (monIndex == -1) return;
-    // Get Currently active workspace on that monitor.
-    int activeWs = currentWorkspace[monIndex];
-    Workspaces[monIndex][activeWs].AddToWorkspace(hwnd);
-    if (Workspaces[monIndex][activeWs].isSelected) {
-        ShowWindow(hwnd, SW_SHOW);
-    }
-    else {
-        ShowWindow(hwnd, SW_HIDE);
-    }
-    std::cout << "New window added to workspace " << (activeWs + 1) << " on monitor " << monIndex << "\n";
+}
+
+void WorkspaceManager::AddUntrackedWindowsToCurrentWorkspace(int monIndex) {
+    auto data = std::make_pair(monIndex, this);
+    EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+        auto* data = reinterpret_cast<std::pair<int, WorkspaceManager*>*>(lParam);
+        int monIndex = data->first;
+        WorkspaceManager* manager = data->second;
+        
+        if (IsWindowVisible(hwnd) && IsRealWindow(hwnd) && !manager->IsWindowTracked(hwnd)) {
+            HMONITOR windowMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (manager->GetMonitorIndex(windowMon) == monIndex) {
+                manager->Workspaces[monIndex][manager->currentWorkspace[monIndex]].AddToWorkspace(hwnd);
+            }
+        }
+        return TRUE;
+    }, reinterpret_cast<LPARAM>(&data));
 }
 
 void CALLBACK WorkspaceManager::WinEventProc(
@@ -231,14 +286,6 @@ void CALLBACK WorkspaceManager::WinEventProc(
             newWs.MoveToWorkspace(oldWs, hwnd);
         }
     }
-
-    //if (idObject != OBJID_WINDOW || !IsWindowVisible(hwnd)) return;
-    //if (!instance) return;
-    //
-    //if (instance->IsWindowTracked(hwnd)) return;
-    //
-    //instance->OnWindowCreated(hwnd);
-
 }
 
 int WorkspaceManager::GetWorkspaceMonitorIndex(HWND hwnd) {
@@ -288,6 +335,7 @@ BOOL CALLBACK WorkspaceManager::MonitorEnumCallback(HMONITOR hMonitor, HDC, LPRE
     return TRUE;
 }
 
+// Helper function if running in Console Subsystem.
 void WorkspaceManager::DumpAllWorkspaces() {
     std::cout << "=== Workspace Dump (non-empty only) ===\n";
 
@@ -318,7 +366,7 @@ void WorkspaceManager::DumpAllWorkspaces() {
         // print each non-empty workspace for this monitor
         for (size_t w = 0; w < wsVec.size(); ++w) {
             const Workspace& ws = wsVec[w];
-            if (ws.windows.empty()) continue; // only show workspaces that actually have windows
+            if (ws.windows.empty()) continue; 
 
             std::cout << "  WS[" << w << "] id=" << ws.id
                 << (ws.isSelected ? " [ACTIVE]" : "")
@@ -326,7 +374,7 @@ void WorkspaceManager::DumpAllWorkspaces() {
 
             for (HWND hwnd : ws.windows) {
                 char title[256] = { 0 };
-                // try to get window title; if empty that's okay
+
                 GetWindowTextA(hwnd, title, sizeof(title));
                 std::cout << "    HWND: " << hwnd << " Title: \"" << title << "\"\n";
             }

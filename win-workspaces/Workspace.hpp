@@ -4,7 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
-
+#include <map>
 struct Workspace {
     size_t id;
     int monitorId;
@@ -48,12 +48,18 @@ struct Workspace {
             return;
         }
 
-        // Always hide the window when moving it, regardless of monitor
-        HideWindowInstant(window);
-
         this->AddToWorkspace(window);
+        
         if (this->isSelected) {
-            ShowWindowInstant(window);
+            // Only show if the window is currently hidden
+            if (!IsWindowVisible(window)) {
+                ShowWindowInstant(window);
+            }
+        } else {
+            // Only hide if the window is currently visible
+            if (IsWindowVisible(window)) {
+                HideWindowInstant(window);
+            }
         }
     }
 

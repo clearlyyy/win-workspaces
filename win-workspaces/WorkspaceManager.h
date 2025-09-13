@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <vector>
 #include <iostream>
+#include <TlHelp32.h>
 #include "Workspace.hpp"
 
 
@@ -21,6 +22,7 @@ public:
     void OnWindowCreated(HWND hwnd);
     void InitHotkeys();
     void Run();
+    void AddUntrackedWindowsToCurrentWorkspace(int monIndex);
 
 private:
     HMONITOR GetCursorMonitor();
